@@ -6,6 +6,7 @@ import requests
 import smtplib
 from email.mime.text import MIMEText
 
+
 def get_os():
     return py_platform.system().lower()
 
@@ -17,8 +18,10 @@ def open_file(path):
 
         if os_type == "darwin":
             subprocess.run(["open", full_path])
+
         elif os_type == "windows":
             os.startfile(full_path)
+
         elif os_type == "linux":
             subprocess.run(["xdg-open", full_path])
 
@@ -31,124 +34,148 @@ def open_file(path):
 def open_app(app_name):
     try:
         os_type = get_os()
-        app_name = app_name.lower()
+        app_name = app_name.strip()
 
-        if os_type == "darwin":
-            subprocess.run(["open", "-a", app_name])
+        # -----------------------------
+        # WINDOWS
+        # -----------------------------
+        if os_type == "windows":
 
-        elif os_type == "windows":
-            apps = {
-                "chrome": "start chrome",
-                "calculator": "start calc",
-                "calc": "start calc",
-                "word": "start winword",
-                "notepad": "start notepad",
-                "vs code": "start code",
-                "vscode": "start code"
+            app_map = {
+                "chrome": "chrome",
+                "google chrome": "chrome",
+                "calculator": "calc",
+                "calc": "calc",
+                "notepad": "notepad",
+                "word": "winword",
+                "excel": "excel",
+                "powerpoint": "powerpnt",
+                "vs code": "code",
+                "vscode": "code",
+                "edge": "msedge"
             }
 
-            for key in apps:
-                if key in app_name:
-                    subprocess.run(apps[key], shell=True)
+            app_key = app_name.lower()
+
+            # 🔹 Step 1: Known apps
+            for key in app_map:
+                if key in app_key:
+                    subprocess.run(f'start "" "{app_map[key]}"', shell=True)
                     return f"Opened app: {key}"
 
-            return f"App '{app_name}' not supported"
+            # 🔹 Step 2: Try opening anything (fallback)
+            subprocess.run(f'start "" "{app_name}"', shell=True)
+            return f"Trying to open: {app_name}"
 
+        # -----------------------------
+        # macOS
+        # -----------------------------
+        elif os_type == "darwin":
+            try:
+                subprocess.run(["open", "-a", app_name])
+                return f"Opened app: {app_name}"
+            except:
+                subprocess.run(["open", app_name])
+                return f"Trying to open: {app_name}"
+
+        # -----------------------------
+        # LINUX
+        # -----------------------------
         elif os_type == "linux":
-            subprocess.run([app_name])
+            try:
+                subprocess.run([app_name])
+                return f"Opened app: {app_name}"
+            except:
+                subprocess.run(["xdg-open", app_name])
+                return f"Trying to open: {app_name}"
 
-        return f"Opened app: {app_name}"
-
-    except Exception as e:
-        return str(e)
-
-
-
-def send_email(to_email, subject, body):
-    try:
-        sender = "your_email@gmail.com"
-        password = "your_app_password"   # ⚠️ use app password
-
-        msg = MIMEText(body)
-        msg["Subject"] = subject
-        msg["From"] = sender
-        msg["To"] = to_email
-
-        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
-        server.login(sender, password)
-        server.send_message(msg)
-        server.quit()
-
-        return "Email sent successfully"
+        else:
+            return "Unsupported OS"
 
     except Exception as e:
-        return str(e)
+        return f"Error: {str(e)}"
+
 def close_app(app_name):
-    """
-    Kills a running application by name.
-    Tries multiple name variations to handle cases like
-    'microsoft outlook' -> 'Microsoft Outlook'.
-    """
     try:
-        os_type = get_os()
+        import subprocess
+        import platform
 
-        # Build a list of name variations to try
-        variations = [
-            app_name,                          # as given: "microsoft outlook"
-            app_name.title(),                  # title case: "Microsoft Outlook"
-            app_name.capitalize(),             # first word cap: "Microsoft outlook"
-            app_name.replace(" ", ""),         # no spaces: "microsoftoutlook"
-            app_name.title().replace(" ", ""), # title + no spaces: "MicrosoftOutlook"
-        ]
+        os_type = platform.system().lower()
+        app_name = app_name.lower()
 
-        if os_type == "darwin":
-            # Try osascript first — most reliable for macOS GUI apps
-            title_name = app_name.title()
+        # -----------------------------
+        # WINDOWS
+        # -----------------------------
+        if os_type == "windows":
+
+            app_map = {
+                "chrome": "chrome.exe",
+                "calculator": "CalculatorApp.exe",
+                "calc": "CalculatorApp.exe",
+                "notepad": "notepad.exe",
+                "word": "WINWORD.EXE",
+                "excel": "EXCEL.EXE",
+                "powerpoint": "POWERPNT.EXE",
+                "vs code": "Code.exe",
+                "vscode": "Code.exe",
+                "edge": "msedge.exe"
+            }
+
+            for key in app_map:
+                if key in app_name:
+                    exe = app_map[key]
+
+                    result = subprocess.run(
+                        f'taskkill /F /IM "{exe}"',
+                        shell=True,
+                        capture_output=True,
+                        text=True
+                    )
+
+                    if result.returncode == 0:
+                        return f"Closed app: {key}"
+                    else:
+                        return f"App '{key}' is not running or cannot be closed"
+
+            return f"App '{app_name}' not recognized"
+
+        # -----------------------------
+        # macOS
+        # -----------------------------
+        elif os_type == "darwin":
+
             result = subprocess.run(
-                ["osascript", "-e", f'tell application "{title_name}" to quit'],
-                capture_output=True, text=True
+                ["osascript", "-e", f'tell application "{app_name}" to quit'],
+                capture_output=True,
+                text=True
             )
+
             if result.returncode == 0:
-                return f"Closed: {app_name}"
+                return f"Closed app: {app_name}"
+            else:
+                return f"Could not close '{app_name}'"
 
-            # Fallback: try pkill with each variation
-            for name in variations:
-                result = subprocess.run(
-                    ["pkill", "-ix", name],
-                    capture_output=True, text=True
-                )
-                if result.returncode == 0:
-                    return f"Closed: {app_name}"
-
-            return f"Could not close '{app_name}'. Make sure it is running."
-
-        elif os_type == "windows":
-            for name in variations:
-                exe = name if name.endswith(".exe") else name + ".exe"
-                result = subprocess.run(
-                    f'taskkill /F /IM "{exe}"',
-                    shell=True, capture_output=True,
-                    text=True, encoding="utf-8"
-                )
-                if result.returncode == 0:
-                    return f"Closed: {app_name}"
-
-            return f"Could not close '{app_name}'. Make sure it is running."
-
+        # -----------------------------
+        # LINUX
+        # -----------------------------
         elif os_type == "linux":
-            for name in variations:
-                result = subprocess.run(
-                    ["pkill", "-i", name],
-                    capture_output=True, text=True
-                )
-                if result.returncode == 0:
-                    return f"Closed: {app_name}"
 
-            return f"Could not close '{app_name}'. Make sure it is running."
+            result = subprocess.run(
+                ["pkill", "-f", app_name],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode == 0:
+                return f"Closed app: {app_name}"
+            else:
+                return f"App '{app_name}' is not running"
+
+        else:
+            return "Unsupported OS"
 
     except Exception as e:
-        return str(e)
-
+        return f"Error closing app: {str(e)}"
 
 def list_files(path="."):
     try:
